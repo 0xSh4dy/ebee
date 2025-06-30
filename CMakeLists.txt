@@ -41,11 +41,16 @@ separate_arguments(LLVM_CXXFLAGS)
 separate_arguments(LLVM_LDFLAGS)
 separate_arguments(LLVM_LIBS)
 
+
+find_package(PkgConfig REQUIRED)
+pkg_check_modules(LIBBPF REQUIRED libbpf)
+
+target_include_directories(${PROJECT_NAME} PRIVATE ${LIBBPF_INCLUDE_DIRS})
 target_compile_options(${PROJECT_NAME} PRIVATE ${LLVM_CXXFLAGS})
 target_compile_options(${PROJECT_NAME} PRIVATE -fexceptions)
 target_compile_options(ebeelib PRIVATE -fexceptions)
 target_link_options(${PROJECT_NAME} PRIVATE ${LLVM_LDFLAGS})
-target_link_libraries(${PROJECT_NAME} PRIVATE ${LLVM_LIBS})
+target_link_libraries(${PROJECT_NAME} PRIVATE ${LLVM_LIBS} ${LIBBPF_LIBRARIES})
 
 
 include(FetchContent)
@@ -64,3 +69,35 @@ target_link_libraries(tests
     gtest_main ebeelib ${LLVM_LIBS}
 )
 gtest_discover_tests(tests)
+
+
+# Instructions to compile eBPF programs
+file(GLOB_RECURSE EBPF_SOURCES CONFIGURE_DEPENDS ${CMAKE_SOURCE_DIR}/ebpf/*.c)
+
+set(EBPF_OUTPUT_DIR ${CMAKE_BINARY_DIR}/ebpf)
+file(MAKE_DIRECTORY ${EBPF_OUTPUT_DIR})
+
+foreach(ebpf_src ${EBPF_SOURCES})
+    get_filename_component(src_name ${ebpf_src} NAME_WE)
+    set(output_obj ${EBPF_OUTPUT_DIR}/${src_name}.o)
+
+    add_custom_command(
+        OUTPUT ${output_obj}
+        COMMAND clang
+            -target bpf
+            -O2
+            -g
+            -D__TARGET_ARCH_x86
+            -I ${CMAKE_SOURCE_DIR}/include
+            -c ${ebpf_src}
+            -o ${output_obj}
+        DEPENDS ${ebpf_src}
+        COMMENT "Compiling eBPF program: ${src_name}.c -> ${src_name}.o"
+        VERBATIM
+    )
+
+    list(APPEND EBPF_OBJECTS ${output_obj})
+endforeach()
+
+# Custom target to build all eBPF objects
+add_custom_target(ebpf_objs ALL DEPENDS ${EBPF_OBJECTS})
