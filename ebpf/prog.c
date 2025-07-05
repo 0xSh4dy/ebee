@@ -4,6 +4,7 @@
 
 struct ebee_event{
   unsigned char payload[20];
+  int size;
 };
 
 struct{
@@ -62,6 +63,7 @@ int check_packets(struct xdp_md *ctx) {
       bpf_printk("failed to allocate memory for the ring buffer");
       return XDP_PASS;
     }
+    evt->size = 20;
     __builtin_memcpy(evt->payload, payload, 20);
     bpf_ringbuf_submit(evt,0);
   }

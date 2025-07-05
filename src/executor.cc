@@ -20,11 +20,11 @@ void Executor::Execute(const std::string &input) {
     auto *fn = reinterpret_cast<int (*)(int, int)>(addr.getValue());
     int res = fn(op1, op2);
     stack_.push(res);
-    std::cout << res << std::endl;
   } else if (op_mode == 2) {
     switch (instr_type) {
     case kPush:
       stack_.push(std::stoi(instrs[1]));
+      break;
     }
   } else if (op_mode == 1) {
     switch (instr_type) {
@@ -32,19 +32,21 @@ void Executor::Execute(const std::string &input) {
       llvm::orc::ExecutorAddr addr = GetExecutorAddr(function_name);
 
       auto *fn = reinterpret_cast<int (*)(int, int)>(addr.getValue());
+      if(!fn){
+        throw std::runtime_error("couldn't find the handler");
+      }
       int val1 = stack_.top();
       stack_.pop();
       int val2 = stack_.top();
       stack_.pop();
       stack_.push(fn(val1, val2) & 0xff);
-      std::cout << "Comparison result " << (fn(val1, val2) & 0xff) << std::endl;
       break;
     }
     case kExit: {
       bool status = stack_.top();
       stack_.pop();
       if (!status) {
-        throw std::runtime_error("values didn't match, leaving");
+        has_errors_ = true;
       }
       break;
     }

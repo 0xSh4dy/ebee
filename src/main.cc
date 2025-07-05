@@ -1,3 +1,4 @@
+#include "challenge.h"
 #include "instructions.h"
 #include <bpf/bpf.h>
 #include <bpf/libbpf.h>
@@ -14,6 +15,7 @@ static int attach_flags = 0;
 
 struct ebee_event {
   unsigned char payload[20];
+  int size;
 };
 
 static void handle_signal(int sig) {
@@ -25,22 +27,19 @@ static void handle_signal(int sig) {
 }
 
 static int event_handler(void *ctx, void *data, size_t len) {
-    std::cout<<"Triggered event handler\n";
-  struct ebee_event *evt = (struct ebee_event*)data;
-  for(int i=0;i<20;i++){
-    printf("%02x ",evt->payload[i]);
-  }
-  fflush(stdout);
-  printf("\n");
+  std::cout << "Triggered event handler\n";
+  struct ebee_event *evt = (struct ebee_event *)data;
+  // for(int i=0;i<20;i++){
+  //   printf("%02x ",evt->payload[i]);
+  // }
+  // fflush(stdout);
+  // printf("\n");
+  std::cout << evt->size << std::endl;
+  StartChallenge(evt->payload, evt->size);
   return 0;
 }
 
-int main(int argc, char **argv) {
-  if (argc < 3) {
-    fprintf(stderr, "Usage: %s <ifname> <bpf_obj_file>\n", argv[0]);
-    return 1;
-  }
-
+int Run(int argc, char **argv) {
   const char *if_name = argv[1];
   const char *obj_file = argv[2];
   ifindex = if_nametoindex(if_name);
@@ -111,6 +110,16 @@ int main(int argc, char **argv) {
     }
     sleep(1);
   }
+  return 0;
+}
 
+int main(int argc, char **argv) {
+  // if (argc < 3) {
+  //   fprintf(stderr, "Usage: %s <ifname> <bpf_obj_file>\n", argv[0]);
+  //   return 1;
+  // }
+  char *buffer = const_cast<char *>("j1tT3D_4ND_c0MmItT3d");
+  StartChallenge(reinterpret_cast<unsigned char *>(buffer), 0);
+  // return Run(argc,argv);
   return 0;
 }

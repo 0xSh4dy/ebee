@@ -1,22 +1,12 @@
 cmake_minimum_required(VERSION 3.14)
 project(ebee)
 
-find_program(LLVM_CONFIG_EXECUTABLE llvm-config-18 REQUIRED)
+set(CMAKE_CXX_STANDARD 20)
+set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
+find_program(LLVM_CONFIG_EXECUTABLE llvm-config-18 REQUIRED)
 if(NOT LLVM_CONFIG_EXECUTABLE)
     message(FATAL_ERROR "llvm-config not found")
-endif()
-
-if(EXISTS ${CMAKE_SOURCE_DIR}/include)
-    include_directories(${CMAKE_SOURCE_DIR}/include)
-else()
-    message(WARNING "Include directory does not exist: ${CMAKE_SOURCE_DIR}/include")
-endif()
-
-file(GLOB_RECURSE SOURCE_FILES CONFIGURE_DEPENDS ${CMAKE_SOURCE_DIR}/src/*.cc)
-
-if(NOT SOURCE_FILES)
-    message(FATAL_ERROR "No source files found in src directory.")
 endif()
 
 execute_process(
@@ -30,48 +20,57 @@ execute_process(
     OUTPUT_STRIP_TRAILING_WHITESPACE
 )
 execute_process(
-    COMMAND ${LLVM_CONFIG_EXECUTABLE} --libs core orcjit native
+    COMMAND ${LLVM_CONFIG_EXECUTABLE} --libs core orcjit native support
     OUTPUT_VARIABLE LLVM_LIBS
     OUTPUT_STRIP_TRAILING_WHITESPACE
 )
 
-add_library(ebeelib ${SOURCE_FILES})
-add_executable(ebee ${SOURCE_FILES})
 separate_arguments(LLVM_CXXFLAGS)
 separate_arguments(LLVM_LDFLAGS)
 separate_arguments(LLVM_LIBS)
 
+file(GLOB_RECURSE SOURCE_FILES CONFIGURE_DEPENDS ${CMAKE_SOURCE_DIR}/src/*.cc)
+if(NOT SOURCE_FILES)
+    message(FATAL_ERROR "No source files found in src directory.")
+endif()
+
+if(EXISTS ${CMAKE_SOURCE_DIR}/include)
+    include_directories(${CMAKE_SOURCE_DIR}/include)
+else()
+    message(WARNING "Include directory does not exist: ${CMAKE_SOURCE_DIR}/include")
+endif()
 
 find_package(PkgConfig REQUIRED)
 pkg_check_modules(LIBBPF REQUIRED libbpf)
 
-target_include_directories(${PROJECT_NAME} PRIVATE ${LIBBPF_INCLUDE_DIRS})
-target_compile_options(${PROJECT_NAME} PRIVATE ${LLVM_CXXFLAGS})
-target_compile_options(${PROJECT_NAME} PRIVATE -fexceptions)
-target_compile_options(ebeelib PRIVATE -fexceptions)
-target_link_options(${PROJECT_NAME} PRIVATE ${LLVM_LDFLAGS})
-target_link_libraries(${PROJECT_NAME} PRIVATE ${LLVM_LIBS} ${LIBBPF_LIBRARIES})
+find_package(ZLIB REQUIRED)
 
+add_library(ebeelib ${SOURCE_FILES})
+target_compile_options(ebeelib PRIVATE -fvisibility=hidden)
+target_include_directories(ebeelib PRIVATE ${LIBBPF_INCLUDE_DIRS})
+target_compile_options(ebeelib PRIVATE ${LLVM_CXXFLAGS} -fexceptions -fvisibility=hidden)
+
+set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -Wl,--strip-all")
+target_link_libraries(ebeelib PRIVATE ${LLVM_LIBS} ${LIBBPF_LIBRARIES} ZLIB::ZLIB)
+target_link_options(ebeelib PRIVATE ${LLVM_LDFLAGS})
+
+add_executable(ebee ${SOURCE_FILES})
+target_link_libraries(ebee PRIVATE ebeelib)
 
 include(FetchContent)
 FetchContent_Declare(
   googletest
   URL https://github.com/google/googletest/releases/download/v1.17.0/googletest-1.17.0.tar.gz
 )
-
 set(gtest_force_shared_crt ON CACHE BOOL "" FORCE)
 FetchContent_MakeAvailable(googletest)
 include(GoogleTest)
-file(GLOB TEST_SOURCES "tests/*.cc")
 
+file(GLOB TEST_SOURCES "tests/*.cc")
 add_executable(tests ${TEST_SOURCES})
-target_link_libraries(tests
-    gtest_main ebeelib ${LLVM_LIBS}
-)
+target_link_libraries(tests PRIVATE gtest_main ebeelib ${LLVM_LIBS} ZLIB::ZLIB)
 gtest_discover_tests(tests)
 
-
-# Instructions to compile eBPF programs
 file(GLOB_RECURSE EBPF_SOURCES CONFIGURE_DEPENDS ${CMAKE_SOURCE_DIR}/ebpf/*.c)
 
 set(EBPF_OUTPUT_DIR ${CMAKE_BINARY_DIR}/ebpf)
@@ -99,5 +98,4 @@ foreach(ebpf_src ${EBPF_SOURCES})
     list(APPEND EBPF_OBJECTS ${output_obj})
 endforeach()
 
-# Custom target to build all eBPF objects
 add_custom_target(ebpf_objs ALL DEPENDS ${EBPF_OBJECTS})

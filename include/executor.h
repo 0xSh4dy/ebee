@@ -26,6 +26,8 @@ public:
     break;                                                                     \
   }
 
+  inline bool HasErrors() const noexcept { return has_errors_; }
+  
   Executor() {
     llvm::InitializeNativeTarget();
     llvm::InitializeNativeTargetAsmPrinter();
@@ -55,12 +57,14 @@ public:
                                llvm::toString(std::move(err)));
     }
   }
+
 #undef DEFINE_INSTR_HANDLERS
 
   void Execute(const std::string &input);
   std::vector<Instruction *> GetInstructions() const { return instructions_; }
 
 private:
+  bool has_errors_ = false;
   std::stack<int> stack_;
   llvm::LLVMContext ctx_;
   llvm::orc::LLJITBuilder jit_builder_;
