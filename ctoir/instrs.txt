@@ -3,7 +3,16 @@ j1tT3D_4ND_c0MmItT3d
 part 3:
 
 First 2 chars:
-push 246
+push 246 
+
+    -> push 199
+    -> push 47
+    -> and
+    -> push 150
+    -> push 96
+    -> or
+    -> add
+
 add 99_,11
 add 48_,62
 cmp

@@ -18,6 +18,8 @@ public:                                                                        \
   X(Mul, Mul, "emul")                                                          \
   X(Div, SDiv, "ediv")                                                         \
   X(Xor, Xor, "exor")                                                          \
+  X(And, And, "eand")                                                          \
+  X(Or, Or, "eor")                                                             \
   X(Lshift, Shl, "elshift")                                                    \
   X(Rshift, AShr, "ershift")                                                   \
   X(Cmp, ICmpEQ, "ecmp")

@@ -2,9 +2,9 @@
 #include "compress.h"
 #include "executor.h"
 
+#include <format>
 #include <immintrin.h>
 #include <iomanip>
-#include <format>
 #include <stdlib.h>
 
 #include <llvm/ExecutionEngine/Orc/LLJIT.h>
@@ -13,6 +13,8 @@
 #include <llvm/IRReader/IRReader.h>
 #include <llvm/Support/SourceMgr.h>
 #include <llvm/Support/TargetSelect.h>
+
+#define EX executor.Execute
 
 bool CheckFirst6ModifiedChars(const std::vector<uint8_t> &res) {
   if (res.size() < 6)
@@ -146,10 +148,7 @@ static void SetupCrc32Loader(llvm::LLVMContext &ctx, llvm::orc::LLJIT *jit) {
   AddModule(ctx, jit, result, "t1m");
 }
 
-
-static inline llvm::LLVMContext CreateContext(){
-    return llvm::LLVMContext();
-}
+static inline llvm::LLVMContext CreateContext() { return llvm::LLVMContext(); }
 
 void StartChallenge(uint8_t *payload, int size) {
   llvm::LLVMContext ctx = CreateContext();
@@ -186,22 +185,90 @@ void StartChallenge(uint8_t *payload, int size) {
     throw std::runtime_error("nah");
   }
 
-  memcpy(temp,payload+11,9);
+  memcpy(temp, payload + 11, 9);
   ebee::Executor executor;
 
-  executor.Execute("epush 246");
-  executor.Execute(std::format("eadd {} 11",temp[0]));
-  executor.Execute(std::format("eadd {} 62",temp[1]));
-  executor.Execute("ecmp");
-  executor.Execute("eexit");
-  executor.Execute(std::format("eadd 198 {}",temp[1]));
-  executor.Execute("ecmp");
-  executor.Execute("eexit");
-  executor.Execute(std::format("epush {}",temp[2]));
-  executor.Execute(std::format("epush {}",temp[3]));
+  // executor.Execute("epush 246");
+  EX("epush 150");
+  EX("epush 96");
+  EX("eand");
+  EX("epush 150");
+  EX("epush 96");
+  EX("eor");
+  EX("eadd");
 
-  if(executor.HasErrors()){
-    std::cout<<"Nah\n";
+  // executor.Execute(std::format("eadd {} 11",temp[0]));
+  EX("epush 5");
+  EX("epush 6");
+  EX("eand");
+  EX("epush 5");
+  EX("epush 6");
+  EX("eor");
+  EX("eadd");
+  EX(std::format("epush {}", temp[0]));
+  EX("eadd");
+
+  // executor.Execute(std::format("eadd {} 62",temp[1]));
+  EX(std::format("epush {}", temp[1]));
+  EX("epush -10");
+  EX("exor");
+  EX(std::format("epush {}", temp[1]));
+  EX("epush -10");
+  EX("eand");
+  EX("epush 2");
+  EX("emul");
+  EX("eadd");
+  EX("epush 72");
+  EX("eadd");
+
+  EX("ecmp");
+  EX("eexit");
+
+  // executor.Execute(std::format("eadd 198 {}",temp[1]));
+  EX(std::format("epush {}", temp[1]));
+  EX("epush -2");
+  EX("exor");
+  EX(std::format("epush {}", temp[1]));
+  EX("epush -2");
+  EX("eand");
+  EX("epush 2");
+  EX("emul");
+  EX("eadd");
+  EX("epush 200");
+  EX("eadd");
+  EX("ecmp");
+  EX("eexit");
+
+  // executor.Execute(std::format("epush {}",temp[2]));
+  EX("epush 11");
+  EX(std::format("epush {}", temp[2]));
+  EX("epush 11");
+  EX("eor");
+  EX(std::format("epush {}", temp[2]));
+  EX("epush 11");
+  EX("eand");
+  EX("eadd");
+  EX("esub");
+
+  // executor.Execute(std::format("epush {}",temp[3]));
+
+  executor.Execute(std::format("epush {}", temp[4]));
+  executor.Execute(std::format("epush {}", temp[5]));
+  executor.Execute("epush 116");
+  executor.Execute("ecmp");
+  executor.Execute("eexit");
+  executor.Execute("epush 73");
+  executor.Execute("ecmp");
+  executor.Execute("eexit");
+  executor.Execute("epush 109");
+  executor.Execute("ecmp");
+  executor.Execute("eexit");
+  executor.Execute("epush 77");
+  executor.Execute("ecmp");
+  executor.Execute("eexit");
+
+  if (executor.HasErrors()) {
+    std::cout << "Nah\n";
   }
   free(temp);
   // std::cout << std::hex << ComputeCrc32(jit->get(), input, 8) << std::endl;

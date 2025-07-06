@@ -32,7 +32,7 @@ void Executor::Execute(const std::string &input) {
       llvm::orc::ExecutorAddr addr = GetExecutorAddr(function_name);
 
       auto *fn = reinterpret_cast<int (*)(int, int)>(addr.getValue());
-      if(!fn){
+      if (!fn) {
         throw std::runtime_error("couldn't find the handler");
       }
       int val1 = stack_.top();
@@ -53,6 +53,27 @@ void Executor::Execute(const std::string &input) {
     case kPop:
       stack_.pop();
       break;
+    case kAnd:
+    case kOr:
+    case kAdd:
+    case kSub:
+    case kMul:
+    case kDiv:
+    case kXor:
+    case kLshift:
+    case kRshift: {
+      llvm::orc::ExecutorAddr addr = GetExecutorAddr(function_name);
+      auto *fn = reinterpret_cast<int (*)(int, int)>(addr.getValue());
+      if (!fn) {
+        throw std::runtime_error("couldn't find the handler");
+      }
+      int val1 = stack_.top();
+      stack_.pop();
+      int val2 = stack_.top();
+      stack_.pop();
+      stack_.push(fn(val1, val2));
+      break;
+    }
     default:
       throw std::runtime_error("cannot execute unknown instruction");
     }
