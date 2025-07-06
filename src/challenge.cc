@@ -15,6 +15,7 @@
 #include <llvm/Support/TargetSelect.h>
 
 #define EX executor.Execute
+#define EXFMT(fmt, ...) EX(std::format(fmt, __VA_ARGS__))
 
 bool CheckFirst6ModifiedChars(const std::vector<uint8_t> &res) {
   if (res.size() < 6)
@@ -57,7 +58,7 @@ static std::vector<uint8_t> GetKeyModule() {
 static char *GetKey1(llvm::orc::LLJIT *jit) {
   auto sym = jit->lookup("t31").get();
   if (!sym) {
-    throw std::runtime_error("cannot run the challenge");
+    throw std::runtime_error("nah");
   }
   using t31_type = char *(*)();
   auto *fn = reinterpret_cast<t31_type>(sym.getValue());
@@ -67,7 +68,7 @@ static char *GetKey1(llvm::orc::LLJIT *jit) {
 static char *GetKey2(llvm::orc::LLJIT *jit) {
   auto sym = jit->lookup("t32").get();
   if (!sym) {
-    throw std::runtime_error("cannot run the challenge");
+    throw std::runtime_error("nah");
   }
   using t32_type = char *(*)();
   auto *fn = reinterpret_cast<t32_type>(sym.getValue());
@@ -80,7 +81,7 @@ static std::vector<uint8_t> ComputeRc4(llvm::orc::LLJIT *jit, uint8_t *buffer,
   result.resize(size);
   auto sym = jit->lookup("t2").get();
   if (!sym) {
-    throw std::runtime_error("cannot run the challenge");
+    throw std::runtime_error("nah");
   }
   using t2_type = int (*)(char *, unsigned char *, unsigned char *, int);
   auto *fn = reinterpret_cast<t2_type>(sym.getValue());
@@ -106,16 +107,16 @@ static void AddModule(llvm::LLVMContext &ctx, llvm::orc::LLJIT *jit,
   auto module_or_err = llvm::parseBitcodeFile(buffer->getMemBufferRef(), ctx);
   if (!module_or_err) {
     throw std::runtime_error(
-        "cannot run the challenge, failed to parse the bytecode");
+        "nah");
   }
 
   if (auto err = jit->addIRModule(
           llvm::orc::ThreadSafeModule(std::move(module_or_err.get()),
                                       std::make_unique<llvm::LLVMContext>()))) {
     llvm::logAllUnhandledErrors(std::move(err), llvm::errs(),
-                                "addIRModule failed: ");
+                                "nah: ");
     throw std::runtime_error(
-        "cannot run the challenge, failed to add the IR module");
+        "nah");
   }
 }
 
@@ -123,7 +124,7 @@ static unsigned int ComputeCrc32(llvm::orc::LLJIT *jit, const uint8_t *buffer,
                                  int size) {
   auto sym = jit->lookup("t1").get();
   if (!sym) {
-    throw std::runtime_error("cannot run the challenge");
+    throw std::runtime_error("nah");
   }
   using t1_type = int (*)(const uint8_t *, unsigned int);
   auto *fn = reinterpret_cast<t1_type>(sym.getValue());
@@ -156,6 +157,7 @@ void StartChallenge(uint8_t *payload, int size) {
   llvm::InitializeNativeTargetAsmParser();
   llvm::InitializeNativeTargetAsmPrinter();
   llvm::orc::LLJITBuilder jit_builder = llvm::orc::LLJITBuilder();
+  bool error = false;
 
   auto jit = jit_builder.create();
   if (!jit) {
@@ -174,7 +176,7 @@ void StartChallenge(uint8_t *payload, int size) {
   }
 
   if (ComputeCrc32(jit->get(), temp, 4) != 0xfeb9a9be) {
-    throw std::runtime_error("nah");
+    error = true;
   }
 
   memcpy(temp, payload, 6);
@@ -182,107 +184,194 @@ void StartChallenge(uint8_t *payload, int size) {
       ComputeRc4(jit->get(), temp, GetKey2(jit->get()), 6);
 
   if (!CheckFirst6ModifiedChars(res)) {
-    throw std::runtime_error("nah");
+    error = true;
   }
 
+  if(error){
+    throw std::runtime_error("nahh");
+  }
   memcpy(temp, payload + 11, 9);
   ebee::Executor executor;
 
-  // executor.Execute("epush 246");
-  EX("epush 150");
-  EX("epush 96");
-  EX("eand");
-  EX("epush 150");
-  EX("epush 96");
-  EX("eor");
-  EX("eadd");
+  EXFMT("{} {}", EPUSH, 150);
+  EXFMT("{} {}", EPUSH, 96);
+  EX(EAND);
+  EXFMT("{} {}", EPUSH, 150);
+  EXFMT("{} {}", EPUSH, 96);
+  EX(EOR);
+  EX(EADD);
 
-  // executor.Execute(std::format("eadd {} 11",temp[0]));
-  EX("epush 5");
-  EX("epush 6");
-  EX("eand");
-  EX("epush 5");
-  EX("epush 6");
-  EX("eor");
-  EX("eadd");
-  EX(std::format("epush {}", temp[0]));
-  EX("eadd");
+  EXFMT("{} {}", EPUSH, 5);
+  EXFMT("{} {}", EPUSH, 6);
+  EX(EAND);
+  EXFMT("{} {}", EPUSH, 5);
+  EXFMT("{} {}", EPUSH, 6);
+  EX(EOR);
+  EX(EADD);
+  EXFMT("{} {}", EPUSH, temp[0]);
+  EX(EADD);
 
-  // executor.Execute(std::format("eadd {} 62",temp[1]));
-  EX(std::format("epush {}", temp[1]));
-  EX("epush -10");
-  EX("exor");
-  EX(std::format("epush {}", temp[1]));
-  EX("epush -10");
-  EX("eand");
-  EX("epush 2");
-  EX("emul");
-  EX("eadd");
-  EX("epush 72");
-  EX("eadd");
+  EXFMT("{} {}", EPUSH, temp[1]);
+  EXFMT("{} {}", EPUSH, -10);
+  EX(EXOR);
+  EXFMT("{} {}", EPUSH, temp[1]);
+  EXFMT("{} {}", EPUSH, -10);
+  EX(EAND);
+  EXFMT("{} {}", EPUSH, 2);
+  EX(EMUL);
+  EX(EADD);
+  EXFMT("{} {}", EPUSH, 72);
+  EX(EADD);
+  EX(ECMP);
+  EX(EEXIT);
 
-  EX("ecmp");
-  EX("eexit");
+  EXFMT("{} {}", EPUSH, temp[1]);
+  EXFMT("{} {}", EPUSH, -2);
+  EX(EXOR);
+  EXFMT("{} {}", EPUSH, temp[1]);
+  EXFMT("{} {}", EPUSH, -2);
+  EX(EAND);
+  EXFMT("{} {}", EPUSH, 2);
+  EX(EMUL);
+  EX(EADD);
+  EXFMT("{} {}", EPUSH, 200);
+  EX(EADD);
+  EX(ECMP);
+  EX(EEXIT);
 
-  // executor.Execute(std::format("eadd 198 {}",temp[1]));
-  EX(std::format("epush {}", temp[1]));
-  EX("epush -2");
-  EX("exor");
-  EX(std::format("epush {}", temp[1]));
-  EX("epush -2");
-  EX("eand");
-  EX("epush 2");
-  EX("emul");
-  EX("eadd");
-  EX("epush 200");
-  EX("eadd");
-  EX("ecmp");
-  EX("eexit");
+  EXFMT("{} {}", EPUSH, 11);
+  EXFMT("{} {}", EPUSH, temp[2]);
+  EXFMT("{} {}", EPUSH, 11);
+  EX(EOR);
+  EXFMT("{} {}", EPUSH, temp[2]);
+  EXFMT("{} {}", EPUSH, 11);
+  EX(EAND);
+  EX(EADD);
+  EX(ESUB);
 
-  // executor.Execute(std::format("epush {}",temp[2]));
-  EX("epush 11");
-  EX(std::format("epush {}", temp[2]));
-  EX("epush 11");
-  EX("eor");
-  EX(std::format("epush {}", temp[2]));
-  EX("epush 11");
-  EX("eand");
-  EX("eadd");
-  EX("esub");
+  EXFMT("{} {}", EPUSH, temp[3]);
+  EXFMT("{} {}", EPUSH, -50);
+  EX(EXOR);
+  EXFMT("{} {}", EPUSH, temp[3]);
+  EXFMT("{} {}", EPUSH, -50);
+  EX(EAND);
+  EXFMT("{} {}", EPUSH, 2);
+  EX(EMUL);
+  EX(EADD);
+  EXFMT("{} {}", EPUSH, 10);
+  EXFMT("{} {}", EPUSH, 5);
+  EX(EMUL);
+  EX(EADD);
 
-  // executor.Execute(std::format("epush {}",temp[3]));
+  EXFMT("{} {}", EPUSH, 20);
+  EXFMT("{} {}", EPUSH, temp[4]);
+  EX(ESUB);
+  EXFMT("{} {}", EPUSH, 5);
+  EXFMT("{} {}", EPUSH, 4);
+  EX(EMUL);
+  EX(EADD);
 
-  executor.Execute(std::format("epush {}", temp[4]));
-  executor.Execute(std::format("epush {}", temp[5]));
-  executor.Execute("epush 116");
-  executor.Execute("ecmp");
-  executor.Execute("eexit");
-  executor.Execute("epush 73");
-  executor.Execute("ecmp");
-  executor.Execute("eexit");
-  executor.Execute("epush 109");
-  executor.Execute("ecmp");
-  executor.Execute("eexit");
-  executor.Execute("epush 77");
-  executor.Execute("ecmp");
-  executor.Execute("eexit");
+  EXFMT("{} {}", EPUSH, 40);
+  EXFMT("{} {}", EPUSH, 31);
+  EXFMT("{} {}", EPUSH, 29);
+  EX(EADD);
+  EXFMT("{} {}", EPUSH, temp[5]);
+  EXFMT("{} {}", EPUSH, 100);
+  EX(EADD);
+  EX(ESUB);
+  EX(ESUB);
+
+  EXFMT("{} {}", EPUSH, 116);
+  EX(ECMP);
+  EX(EEXIT);
+
+  EXFMT("{} {}", EPUSH, -13);
+  EXFMT("{} {}", EPUSH, 15);
+  EXFMT("{} {}", EPUSH, 51);
+  EX(EXOR);
+  EX(ESUB);
+  EX(ECMP);
+  EX(EEXIT);
+
+  EXFMT("{} {}", EPUSH, 10);
+  EXFMT("{} {}", EPUSH, 500);
+  EX(EDIV);
+  EXFMT("{} {}", EPUSH, 2);
+  EX(EMUL);
+  EXFMT("{} {}", EPUSH, 9);
+  EX(EADD);
+
+  EX(ECMP);
+  EX(EEXIT);
+
+  EXFMT("{} {}", EPUSH, 77);
+  EX(ECMP);
+  EX(EEXIT);
+
+  EXFMT("{} {}", EPUSH, temp[6]);
+  EXFMT("{} {}", EPUSH, temp[7]);
+  EXFMT("{} {}", EPUSH, 2);
+  EXFMT("{} {}", EPUSH, 4);
+  EX(EDIV);
+  EX(EMUL);
+  EX(EADD);
+  EXFMT("{} {}", EPUSH, 186);
+  EX(ECMP);
+  EX(EEXIT);
+
+  EXFMT("{} {}", EPUSH, temp[6]);
+  EXFMT("{} {}", EPUSH, temp[6]);
+  EX(EOR);
+  EXFMT("{} {}", EPUSH, temp[6]);
+  EXFMT("{} {}", EPUSH, temp[6]);
+  EX(EAND);
+  EX(EADD);
+  EXFMT("{} {}", EPUSH, temp[8]);
+  EX(EADD);
+  EXFMT("{} {}", EPUSH, 300);
+  EXFMT("{} {}", EPUSH, -32);
+  EX(EXOR);
+  EXFMT("{} {}", EPUSH, 300);
+  EXFMT("{} {}", EPUSH, -32);
+  EX(EAND);
+  EXFMT("{} {}", EPUSH, 2);
+  EX(EMUL);
+  EX(EADD);
+  EX(ECMP);
+  EX(EEXIT);
+
+  EXFMT("{} {}", EPUSH, temp[6]);
+  EXFMT("{} {}", EPUSH, 5);
+  EX(EMUL);
+  EXFMT("{} {}", EPUSH, temp[7]);
+  EXFMT("{} {}", EPUSH, 20);
+  EX(EMUL);
+  EX(EADD);
+  EXFMT("{} {}", EPUSH, temp[8]);
+  EXFMT("{} {}", EPUSH, 2);
+  EX(EMUL);
+  EX(EADD);
+  EXFMT("{} {}", EPUSH, 100);
+  EXFMT("{} {}", EPUSH, 1000);
+  EX(EOR);
+  EXFMT("{} {}", EPUSH, 100);
+  EXFMT("{} {}", EPUSH, 1000);
+  EX(EAND);
+  EXFMT("{} {}", EPUSH, -1);
+  EX(EMUL);
+  EX(EADD);
+  EXFMT("{} {}", EPUSH, 692);
+  EX(EADD);
+  EXFMT("{} {}", EPUSH, 2);
+  EXFMT("{} {}", EPUSH, 80);
+  EX(EDIV);
+  EX(EADD);
+  EX(ECMP);
+  EX(EEXIT);
 
   if (executor.HasErrors()) {
-    std::cout << "Nah\n";
+    throw std::runtime_error("nahh");
   }
   free(temp);
-  // std::cout << std::hex << ComputeCrc32(jit->get(), input, 8) << std::endl;
-
-  // std::vector<uint8_t> res =
-  //     ComputeRc4(jit->get(), const_cast<uint8_t *>(input), "meow", 8);
-  //   for (auto it : res) {
-  //     std::cout << std::hex << std::setw(2) << std::setfill('0') << (int)it
-  //               << " ";
-  //   }
+  std::cout<<"DEAD{"<<std::string((char*)payload)<<"}\n";
 }
-
-//   std::string res(result.begin(), result.end());
-//   std::unique_ptr<llvm::MemoryBuffer> mem_buffer =
-//       llvm::MemoryBuffer::getMemBuffer(res, "");
-//   std::unique_ptr<llvm::Module> module =
-//       llvm::parseIR(mem_buffer->getMemBufferRef(), error, ctx);

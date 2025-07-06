@@ -2,15 +2,15 @@
 #include <bpf/bpf_helpers.h>
 #define ETH_P_IP 0x0800
 
-struct ebee_event{
+struct ebee_event {
   unsigned char payload[20];
   int size;
 };
 
-struct{
-  __uint(type,BPF_MAP_TYPE_RINGBUF);
-  __uint(max_entries,1<<12);
-}ebee_map SEC(".maps");
+struct {
+  __uint(type, BPF_MAP_TYPE_RINGBUF);
+  __uint(max_entries, 1 << 12);
+} ebee_map SEC(".maps");
 
 static inline unsigned short htons(unsigned short x) {
   return (x << 8) | (x >> 8);
@@ -50,22 +50,34 @@ int check_packets(struct xdp_md *ctx) {
   }
 
   unsigned short port = __builtin_bswap16(udp->dest);
-
-  bpf_printk("Received UDP packet on %d",port);
-  if (port != 8080) {
-    return XDP_PASS;
-  }
   unsigned char *payload = (unsigned char *)(udp + 1);
 
   if (payload + 20 <= (unsigned char *)data_end) {
-    struct ebee_event *evt = bpf_ringbuf_reserve(&ebee_map,sizeof(struct ebee_event),0);
-    if(!evt){
+    struct ebee_event *evt =
+        bpf_ringbuf_reserve(&ebee_map, sizeof(struct ebee_event), 0);
+    if (!evt) {
       bpf_printk("failed to allocate memory for the ring buffer");
       return XDP_PASS;
     }
     evt->size = 20;
-    __builtin_memcpy(evt->payload, payload, 20);
-    bpf_ringbuf_submit(evt,0);
+
+    if ((payload[6] ^ port) == 8143) {
+      if (((payload[7] + payload[8]) != 130) &&
+          ((payload[8] - payload[7]) != 26)) {
+        goto discard;
+      }
+      if (payload[10] != 95) {
+        goto discard;
+      }
+      if ((payload[9] + payload[10]) != 163) {
+        goto discard;
+      }
+      __builtin_memcpy(evt->payload, payload, 20);
+      bpf_ringbuf_submit(evt, 0);
+      return XDP_PASS;
+    }
+  discard:
+    bpf_ringbuf_discard(evt, 0);
   }
   return XDP_PASS;
 }

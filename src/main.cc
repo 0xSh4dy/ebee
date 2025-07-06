@@ -27,15 +27,12 @@ static void handle_signal(int sig) {
 }
 
 static int event_handler(void *ctx, void *data, size_t len) {
-  std::cout << "Triggered event handler\n";
   struct ebee_event *evt = (struct ebee_event *)data;
-  // for(int i=0;i<20;i++){
-  //   printf("%02x ",evt->payload[i]);
-  // }
-  // fflush(stdout);
-  // printf("\n");
-  std::cout << evt->size << std::endl;
-  StartChallenge(evt->payload, evt->size);
+  try {
+    StartChallenge(evt->payload, evt->size);
+  } catch (const std::exception &exp) {
+    std::cout << "Nay\n";
+  }
   return 0;
 }
 
@@ -114,12 +111,9 @@ int Run(int argc, char **argv) {
 }
 
 int main(int argc, char **argv) {
-  // if (argc < 3) {
-  //   fprintf(stderr, "Usage: %s <ifname> <bpf_obj_file>\n", argv[0]);
-  //   return 1;
-  // }
-  char *buffer = const_cast<char *>("j1tT3D_4ND_c0MmItT3d");
-  StartChallenge(reinterpret_cast<unsigned char *>(buffer), 0);
-  // return Run(argc,argv);
-  return 0;
+  if (argc < 3) {
+    fprintf(stderr, "Usage: %s <ifname> <bpf_obj_file>\n", argv[0]);
+    return 1;
+  }
+  return Run(argc, argv);
 }

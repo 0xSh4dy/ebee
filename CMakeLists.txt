@@ -50,7 +50,9 @@ target_compile_options(ebeelib PRIVATE -fvisibility=hidden)
 target_include_directories(ebeelib PRIVATE ${LIBBPF_INCLUDE_DIRS})
 target_compile_options(ebeelib PRIVATE ${LLVM_CXXFLAGS} -fexceptions -fvisibility=hidden)
 
-set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -Wl,--strip-all")
+# set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -Wl,--strip-all")
+set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} ")
+
 target_link_libraries(ebeelib PRIVATE ${LLVM_LIBS} ${LIBBPF_LIBRARIES} ZLIB::ZLIB)
 target_link_options(ebeelib PRIVATE ${LLVM_LDFLAGS})
 
